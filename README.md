@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself — listing files, searching, and reading
 — then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.1.0** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 0.1.1** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -14,6 +14,8 @@ project and it explores the code itself — listing files, searching, and readin
   and `search` (find a string across the whole project with line numbers).
 - **Visible reasoning** — prints every step of the loop, so you can watch it
   think instead of trusting a black box.
+- **Bounded loop** — after 10 tool-using turns, the agent pauses to ask you to
+  continue and prompts Claude to justify itself before going on.
 - **Command-line interface** — ask questions directly: `agent.py "question"`.
 
 ## How it works
@@ -30,6 +32,9 @@ Claude Code:
 The conversation history (the `messages` list) grows each iteration, so Claude
 remembers everything it has already found.
 
+To avoid runaway loops, after `STEP_LIMIT` (10) tool-using turns the agent
+pauses and asks you whether to continue, and asks Claude to justify itself.
+
 ## Tech stack
 
 - **Python 3**
@@ -41,6 +46,7 @@ remembers everything it has already found.
 ```
 .
 ├── agent.py        # the entire agent: tools, tool-use loop, CLI
+├── test_agent.py   # unit tests (run: python -m unittest test_agent)
 ├── .env            # Anthropic API key (gitignored)
 └── .gitignore
 ```
@@ -66,4 +72,5 @@ remembers everything it has already found.
 - [x] Tool-use loop
 - [x] Three tools (`list_files`, `read_file`, `search`)
 - [x] CLI with step visibility
-- [ ] Robustness (error handling, truncation, step limit)
+- [x] Step limit (nudge + human-in-the-loop gate)
+- [ ] Robustness (error handling, truncation, noise filtering)
