@@ -3,6 +3,26 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [0.1.2] - 2026-09-23
+
+### Added
+
+- **Tool crash safety** — a `run_tool()` dispatcher wraps every tool call in a
+  safety net, so a crashing tool returns an error message instead of killing
+  the run.
+- **Truncation** — tool results are capped at `MAX_RESULT_CHARS` (8000) with a
+  visible `...[truncated]` marker, so large files or listings can't blow up the
+  context window.
+- **Noise filtering** — `list_files` and `search` skip binary files (via a
+  null-byte check) and ignored directories (`node_modules`, `.git`, `.venv`,
+  etc.).
+- **`requirements.txt`** — pinned minimum dependencies.
+
+### Changed
+
+- Test suite expanded to 22 tests covering the dispatcher, truncation, and
+  noise filtering.
+
 ## [0.1.1] - 2026-09-23
 
 ### Added

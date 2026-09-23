@@ -4,6 +4,19 @@ import anthropic
 from dotenv import load_dotenv
 
 STEP_LIMIT = 10
+MAX_RESULT_CHARS = 8000
+IGNORED_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    "dist",
+    "build",
+    ".idea",
+    ".vscode",
+    "target",
+}
 
 NUDGE_MESSAGE = (
     "You have used tools {n} times without giving a final answer. "
@@ -68,20 +81,52 @@ tools = [
     },
 ]
 
+def truncate(text, limit=MAX_RESULT_CHARS):
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n...[truncated]"
+
+def is_binary(path):
+    try:
+        with open(path, "rb") as f:
+            return b"\x00" in f.read(1024)
+    except OSError:
+        return True
+
+def skip_dir(name):
+    return name.startswith(".") or name in IGNORED_DIRS
+
+
+def run_tool(name, tool_input):
+    try:
+        if name == "list_files":
+            return list_files(tool_input["directory"])
+        if name == "read_file":
+            return read_file(tool_input["path"])
+        if name == "search":
+            return search(tool_input["query"])
+        return f"Unknown tool: {name}"
+    except Exception as exc:
+        return f"tool {name} crashed {type(exc).__name__}: {exc}"
+
+
 
 def list_files(directory):
     out = []
     for root, dirs, files in os.walk(directory):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not skip_dir(d)]
         for f in files:
-            out.append(os.path.join(root, f))
-    return "\n".join(sorted(out)[:100])
+            path = os.path.join(root, f)
+            if is_binary(path):
+                continue
+            out.append(path)
+    return truncate("\n".join(sorted(out)[:100]))
 
 
 def read_file(path):
     try:
         with open(path, "r") as f:
-            return f.read()
+            return truncate(f.read())
     except FileNotFoundError:
         return f"File not found: {path}"
 
@@ -89,9 +134,11 @@ def read_file(path):
 def search(query, root="."):
     out = []
     for root, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not skip_dir(d)]
         for f in files:
             path = os.path.join(root, f)
+            if is_binary(path):
+                continue
             try:
                 with open(path, "r") as fh:
                     for i, line in enumerate(fh, 1):
@@ -99,7 +146,7 @@ def search(query, root="."):
                             out.append(f"{path}:{i}: {line.strip()}")
             except (UnicodeDecodeError, IsADirectoryError):
                 continue
-    return "\n".join(out[:100])
+    return truncate("\n".join(out[:100]))
 
 
 def run_agent(question, max_steps=None, client=None):
@@ -150,15 +197,8 @@ def run_agent(question, max_steps=None, client=None):
 
         tool_results = []
         for block in tool_uses:
-            print(f"  -> {block.name}({block.input})")
-            if block.name == "list_files":
-                result = list_files(block.input["directory"])
-            elif block.name == "read_file":
-                result = read_file(block.input["path"])
-            elif block.name == "search":
-                result = search(block.input["query"])
-            else:
-                result = "unknown tool"
+            print(f" -> {block.name}({block.input})")
+            result = run_tool(block.name, block.input)
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,

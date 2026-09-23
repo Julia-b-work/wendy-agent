@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself — listing files, searching, and reading
 — then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.1.1** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 0.1.2** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -16,6 +16,8 @@ project and it explores the code itself — listing files, searching, and readin
   think instead of trusting a black box.
 - **Bounded loop** — after 10 tool-using turns, the agent pauses to ask you to
   continue and prompts Claude to justify itself before going on.
+- **Robust** — a crashing tool can't kill the run, results are truncated to a
+  sane size, and binary files and junk directories are filtered out.
 - **Command-line interface** — ask questions directly: `agent.py "question"`.
 
 ## How it works
@@ -45,9 +47,10 @@ pauses and asks you whether to continue, and asks Claude to justify itself.
 
 ```
 .
-├── agent.py        # the entire agent: tools, tool-use loop, CLI
-├── test_agent.py   # unit tests (run: python -m unittest test_agent)
-├── .env            # Anthropic API key (gitignored)
+├── agent.py           # the entire agent: tools, tool-use loop, CLI
+├── test_agent.py      # unit tests (run: python -m unittest test_agent)
+├── requirements.txt   # Python dependencies
+├── .env               # Anthropic API key (gitignored)
 └── .gitignore
 ```
 
@@ -56,7 +59,7 @@ pauses and asks you whether to continue, and asks Claude to justify itself.
 1. Create a virtualenv and install dependencies:
    ```bash
    python -m venv .venv
-   .venv/bin/pip install anthropic python-dotenv
+   .venv/bin/pip install -r requirements.txt
    ```
 2. Create a `.env` file (never commit it):
    ```
@@ -73,4 +76,7 @@ pauses and asks you whether to continue, and asks Claude to justify itself.
 - [x] Three tools (`list_files`, `read_file`, `search`)
 - [x] CLI with step visibility
 - [x] Step limit (nudge + human-in-the-loop gate)
-- [ ] Robustness (error handling, truncation, noise filtering)
+- [x] Tool crash safety
+- [x] Truncation
+- [x] Noise filtering
+- [ ] API error handling (retry + clean messages)
