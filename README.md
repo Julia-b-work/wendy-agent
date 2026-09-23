@@ -61,13 +61,6 @@ remembers everything it has already found.
    .venv/bin/python agent.py "what does run_agent do?"
    ```
 
-## Skills demonstrated
-
-- Anthropic Messages API with **tool use** (`tools`, `tool_use`, `tool_result`)
-- Designing an **agentic loop** (conversation memory, tool dispatch, termination)
-- CLI argument handling with `sys.argv`
-- Defensive tool design (`try`/`except`, filtering hidden dirs and binary files)
-
 ## Status
 
 - [x] Tool-use loop
