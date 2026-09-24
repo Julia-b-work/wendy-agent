@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 import agent
+import anthropic
 
 from types import SimpleNamespace
 from unittest import mock
@@ -217,3 +218,36 @@ class TestNoiseFiltering(unittest.TestCase):
         self.assertNotIn("blob.bin", out)
         self.assertNotIn("node_modules", out)
 
+
+class FakeRateLimitError(anthropic.RateLimitError):
+    
+    def __init__(self, message="rate limited"):
+        Exception.__init__(self, message)
+
+class FakeAuthError(anthropic.AuthenticationError):
+
+    def __init__(self, message="bad key"):
+        Exception.__init__(self, message)
+
+class TestApiErrors(unittest.TestCase):
+    
+    def test_auth_error_does_not_retry(self):
+        fake = FakeClient([FakeAuthError()])
+        with mock.patch("time.sleep"):
+            out = agent.run_agent("q", client=fake)
+        self.assertIn("Authentication error", out)
+        self.assertEqual(len(fake.messages.calls), 1)
+
+    def test_retryable_error_then_success(self):
+        fake = FakeClient([FakeRateLimitError(), text_response("recovered")])
+        with mock.patch("time.sleep"):
+            out = agent.run_agent("q", client=fake)
+        self.assertEqual(out, "recovered")
+        self.assertEqual(len(fake.messages.calls), 2)
+
+    def test_retryable_error_exhausts_retries(self):
+        fake = FakeClient([FakeRateLimitError()] * 3)
+        with mock.patch("time.sleep"):
+            out = agent.run_agent("q", client=fake)
+        self.assertIn("API error after retries", out)
+        self.assertEqual(len(fake.messages.calls), 3)

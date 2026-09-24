@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import anthropic
 from dotenv import load_dotenv
 
@@ -17,6 +18,15 @@ IGNORED_DIRS = {
     ".vscode",
     "target",
 }
+MAX_RETRIES = 3
+RETRYABLE_ERRORS = (
+    anthropic.RateLimitError,
+    anthropic.OverloadedError,
+    anthropic.InternalServerError,
+    anthropic.APIConnectionError,
+    anthropic.APITimeoutError,
+)
+
 
 NUDGE_MESSAGE = (
     "You have used tools {n} times without giving a final answer. "
@@ -148,6 +158,28 @@ def search(query, root="."):
                 continue
     return truncate("\n".join(out[:100]))
 
+def _create(client, messages):
+    system = (
+        "You are a coding assistant exploring a codebase. "
+        "Always use your tools to gather real information before answering — "
+        "never guess or tell the user to do it manually."
+    )
+    delay = 1.0
+    for attempt in range(MAX_RETRIES):
+        try:
+            return client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1000,
+                system=system,
+                tools=tools,
+                messages=messages,
+            )
+        except RETRYABLE_ERRORS:
+            if attempt == MAX_RETRIES - 1:
+                raise
+            print(f" -> retrying (attempt {attempt + 1})...")
+            time.sleep(delay)
+            delay *= 2
 
 def run_agent(question, max_steps=None, client=None):
     if client is None:
@@ -165,17 +197,17 @@ def run_agent(question, max_steps=None, client=None):
             messages.append({"role": "user", "content": NUDGE_MESSAGE.format(n=STEP_LIMIT)})
 
         print(f"\n[step {step}] asking Claude...")
-        response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1000,
-            system=(
-                "You are a coding assistant exploring a codebase. "
-                "Always use your tools to gather real information before answering — "
-                "never guess or tell the user to do it manually."
-            ),
-            tools=tools,
-            messages=messages,
-        )
+        try:
+            response = _create(client, messages)
+        except anthropic.AuthenticationError as exc:
+            return f"Authentication error: {exc}"
+        except RETRYABLE_ERRORS as exc:
+            return f"API error after retries: {exc}"
+        except anthropic.APIError as exc:
+            return f"API error: {exc}"
+        except Exception as exc:
+            return f"Unexpected error: {type(exc).__name__}: {exc}"
+
         messages.append({"role": "assistant", "content": response.content})
 
         for b in response.content:

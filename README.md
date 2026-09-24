@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself — listing files, searching, and reading
 — then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.1.2** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 0.2.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -17,7 +17,8 @@ project and it explores the code itself — listing files, searching, and readin
 - **Bounded loop** — after 10 tool-using turns, the agent pauses to ask you to
   continue and prompts Claude to justify itself before going on.
 - **Robust** — a crashing tool can't kill the run, results are truncated to a
-  sane size, and binary files and junk directories are filtered out.
+  sane size, binary files and junk directories are filtered out, and API errors
+  are retried with backoff and reported cleanly.
 - **Command-line interface** — ask questions directly: `agent.py "question"`.
 
 ## How it works
@@ -79,4 +80,4 @@ pauses and asks you whether to continue, and asks Claude to justify itself.
 - [x] Tool crash safety
 - [x] Truncation
 - [x] Noise filtering
-- [ ] API error handling (retry + clean messages)
+- [x] API error handling (retry + clean messages)

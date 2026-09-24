@@ -3,6 +3,18 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [0.2.0] - 2026-09-23
+
+### Added
+
+- **API error handling** — retries transient errors (rate limit, overloaded,
+  server errors, network, timeout) with exponential backoff, and converts every
+  failure into a clean message instead of crashing.
+
+### Changed
+
+- Test suite expanded to 25 tests, now covering API error handling and retries.
+
 ## [0.1.2] - 2026-09-23
 
 ### Added
