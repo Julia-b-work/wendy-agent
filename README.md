@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself — listing files, searching, and reading
 — then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.2.0** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 0.3.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -20,6 +20,8 @@ project and it explores the code itself — listing files, searching, and readin
   sane size, binary files and junk directories are filtered out, and API errors
   are retried with backoff and reported cleanly.
 - **Command-line interface** — ask questions directly: `agent.py "question"`.
+- **MCP server** — the same tools are exposed as a Model Context Protocol
+  server (`server.py`), so Claude Code and other MCP clients can use them.
 
 ## How it works
 
@@ -38,17 +40,40 @@ remembers everything it has already found.
 To avoid runaway loops, after `STEP_LIMIT` (10) tool-using turns the agent
 pauses and asks you whether to continue, and asks Claude to justify itself.
 
+## MCP server
+
+Wendy's tools are also available as a [Model Context Protocol](https://modelcontextprotocol.io) server:
+
+```bash
+.venv/bin/python server.py
+```
+
+Register it with Claude Code:
+
+```bash
+claude mcp add wendy -- .venv/bin/python server.py
+```
+
+Or inspect it in a browser with the MCP Inspector:
+
+```bash
+.venv/bin/mcp dev server.py
+```
+
 ## Tech stack
 
 - **Python 3**
 - **anthropic** — Claude API client (tool use)
 - **python-dotenv** — loads the API key from `.env`
+- **mcp** — Model Context Protocol (the `server.py` interface)
 
 ## Project structure
 
 ```
 .
-├── agent.py           # the entire agent: tools, tool-use loop, CLI
+├── agent.py           # the agent: tool-use loop, CLI
+├── tools.py           # the three tools + helpers (shared by agent and server)
+├── server.py          # MCP server exposing the tools to MCP clients
 ├── test_agent.py      # unit tests (run: python -m unittest test_agent)
 ├── requirements.txt   # Python dependencies
 ├── .env               # Anthropic API key (gitignored)
@@ -81,3 +106,4 @@ pauses and asks you whether to continue, and asks Claude to justify itself.
 - [x] Truncation
 - [x] Noise filtering
 - [x] API error handling (retry + clean messages)
+- [x] MCP server (tools exposed to MCP clients)

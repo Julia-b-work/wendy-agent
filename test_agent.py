@@ -3,6 +3,7 @@ import tempfile
 import unittest
 import agent
 import anthropic
+import tools
 
 from types import SimpleNamespace
 from unittest import mock
@@ -172,10 +173,10 @@ class TestRunTool(unittest.TestCase):
 class TestTruncate(unittest.TestCase):
 
     def test_short_text_unchanged(self):
-         self.assertEqual(agent.truncate("make my day", limit=20), "make my day")
+         self.assertEqual(tools.truncate("make my day", limit=20), "make my day")
 
     def  test_long_text_trucated(self):
-        out = agent.truncate("x" * 100, limit=20)
+        out = tools.truncate("x" * 100, limit=20)
         self.assertTrue(out.startswith("x" * 20))
         self.assertIn("[truncated]", out)
 
@@ -195,14 +196,14 @@ class TestNoiseFiltering(unittest.TestCase):
             p = os.path.join(d, "somth.txt")
             with open(p, "w") as f:
                 f.write("plain text")
-            self.assertFalse(agent.is_binary(p))
+            self.assertFalse(tools.is_binary(p))
 
     def test_is_binary_null_bytes(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "slop.bin")
             with open(p, "wb") as f:
                 f.write(b"hello\x00world")
-            self.assertTrue(agent.is_binary(p))
+            self.assertTrue(tools.is_binary(p))
 
     def test_list_files_skips_binary_and_ignored_dirs(self):
         with tempfile.TemporaryDirectory() as d:

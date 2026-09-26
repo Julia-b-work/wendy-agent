@@ -3,6 +3,20 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [0.3.0] - 2026-09-26
+
+### Added
+
+- **MCP server** — Wendy's three tools (`list_files`, `read_file`, `search`) are
+  now exposed as a Model Context Protocol server (`server.py`), usable from
+  Claude Code, the MCP Inspector, and any MCP client.
+
+### Changed
+
+- **Extracted tools into `tools.py`** — the tool functions and their helpers
+  (`truncate`, `is_binary`, `skip_dir`) now live in a dedicated module shared by
+  the CLI agent and the MCP server.
+
 ## [0.2.0] - 2026-09-24
 
 ### Added
