@@ -1,4 +1,10 @@
+"""Tests for Wendy: the tools, the agent loop, and the MCP-facing functions.
+
+Run with: python -m unittest test_agent
+"""
+
 import os
+import subprocess
 import tempfile
 import unittest
 import agent
@@ -184,7 +190,7 @@ class TestTruncate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "large.txt")
             with open(p, "w") as f:
-                f.write("x" * 10000)
+                f.write("x" * (tools.MAX_RESULT_CHARS + 1000))
             out = agent.read_file(p)
         self.assertIn("[truncated]", out)
 
@@ -252,3 +258,64 @@ class TestApiErrors(unittest.TestCase):
             out = agent.run_agent("q", client=fake)
         self.assertIn("API error after retries", out)
         self.assertEqual(len(fake.messages.calls), 3)
+
+
+class TestRepoMap(unittest.TestCase):
+
+    def test_shows_tree_and_skips_hidden(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, "a.txt"), "w").close()
+            os.makedirs(os.path.join(d, "src"))
+            open(os.path.join(d, "src", "main.py"), "w").close()
+            os.makedirs(os.path.join(d, ".hidden"))
+            open(os.path.join(d, ".hidden", "secret.txt"), "w").close()
+
+            out = tools.repo_map(d)
+
+        self.assertIn("a.txt", out)
+        self.assertIn("main.py", out)
+        self.assertNotIn("secret.txt", out)
+
+
+class TestGitTools(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        repo = self.tmp.name
+
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+        with open(os.path.join(repo, "a.txt"), "w") as f:
+            f.write("hello\n")
+        subprocess.run(["git", "add", "a.txt"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True, capture_output=True)
+
+        self._old_cwd = os.getcwd()
+        os.chdir(repo)
+        self.addCleanup(os.chdir, self._old_cwd)
+
+    def test_git_log(self):
+        out = tools.git_log()
+        self.assertIn("initial", out)
+
+    def test_git_blame(self):
+        out = tools.git_blame("a.txt")
+        self.assertIn("hello", out)
+
+    def test_git_diff(self):
+        with open("a.txt", "w") as f:
+            f.write("changed\n")
+        out = tools.git_diff()
+        self.assertIn("changed", out)
+
+    def test_git_error_not_a_repo(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.chdir(d)
+            try:
+                out = tools.git_log()
+            finally:
+                os.chdir(self._old_cwd)
+        self.assertIn("git error", out)

@@ -1,11 +1,22 @@
+"""Wendy: an agentic codebase Q&A agent on Claude's tool-use API.
+
+Runs a tool-use loop: sends a question to Claude, executes any tools Claude
+requests, feeds the results back, and repeats until Claude answers in text.
+"""
+
 import sys
 import time
 import anthropic
 from dotenv import load_dotenv
 from tools import list_files, read_file, search
 
+# After this many tool-using turns, pause and ask the human to continue.
 STEP_LIMIT = 10
+
+# Total attempts (initial call + retries) for transient API failures.
 MAX_RETRIES = 3
+
+# Errors worth retrying; everything else (auth, bad request) is not retried.
 RETRYABLE_ERRORS = (
     anthropic.RateLimitError,
     anthropic.OverloadedError,
@@ -15,6 +26,7 @@ RETRYABLE_ERRORS = (
 )
 
 
+# Injected after STEP_LIMIT tool turns to make Claude justify continuing.
 NUDGE_MESSAGE = (
     "You have used tools {n} times without giving a final answer. "
     "Briefly explain why you still need more tools. If you don't have a "
@@ -24,15 +36,18 @@ NUDGE_MESSAGE = (
 
 load_dotenv()
 
+# Created lazily so importing this module never requires an API key.
 _client = None
 
 def get_client():
+    """Return the shared Anthropic client, creating it on first use."""
     global _client
     if _client is None:
         _client = anthropic.Anthropic()
     return _client
 
 
+# The tool schemas Claude sees: name, description, and input shape.
 tools = [
     {
         "name": "list_files",
@@ -79,6 +94,7 @@ tools = [
 ]
 
 def run_tool(name, tool_input):
+    """Dispatch a tool by name; any crash becomes a message, not an exception."""
     try:
         if name == "list_files":
             return list_files(tool_input["directory"])
@@ -93,6 +109,7 @@ def run_tool(name, tool_input):
 
 
 def _create(client, messages):
+    """Call the API, retrying transient errors with exponential backoff."""
     system = (
         "You are a coding assistant exploring a codebase. "
         "Always use your tools to gather real information before answering — "
@@ -116,6 +133,7 @@ def _create(client, messages):
             delay *= 2
 
 def run_agent(question, max_steps=None, client=None):
+    """Run the tool-use loop until Claude answers or a limit is reached."""
     if client is None:
         client = get_client()
 
@@ -126,7 +144,7 @@ def run_agent(question, max_steps=None, client=None):
     nudged = False
     while max_steps is None or step < max_steps:
         step += 1
-        if step == STEP_LIMIT + 1 and not nudged:
+        if step == STEP_LIMIT + 1 and not nudged:  # nudge once, past the limit
             nudged = True
             messages.append({"role": "user", "content": NUDGE_MESSAGE.format(n=STEP_LIMIT)})
 

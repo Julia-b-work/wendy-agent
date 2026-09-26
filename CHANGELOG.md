@@ -3,6 +3,21 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [0.4.0] - 2026-09-26
+
+### Added
+
+- **Git history tools** — `git_log`, `git_blame`, and `git_diff` answer the
+  "why did this change?" questions that plain search can't.
+- **`repo_map`** — a tree-style map of the project's structure.
+- **Demo recordings** — VHS tapes and GIFs showing the CLI, the git tools, and
+  Claude Code invoking the MCP server.
+
+### Changed
+
+- The MCP server now exposes seven tools; the test suite grew to 30 tests, with
+  the git tools tested against a real temp git repository.
+
 ## [0.3.0] - 2026-09-26
 
 ### Added

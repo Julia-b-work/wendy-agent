@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself — listing files, searching, and reading
 — then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.3.0** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 0.4.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -20,7 +20,9 @@ project and it explores the code itself — listing files, searching, and readin
   sane size, binary files and junk directories are filtered out, and API errors
   are retried with backoff and reported cleanly.
 - **Command-line interface** — ask questions directly: `agent.py "question"`.
-- **MCP server** — the same tools are exposed as a Model Context Protocol
+- **History-aware** — `git_log`, `git_blame`, `git_diff`, and `repo_map` answer
+  the "why did this change?" questions that plain search can't.
+- **MCP server** — all seven tools are exposed as a Model Context Protocol
   server (`server.py`), so Claude Code and other MCP clients can use them.
 
 ## How it works
@@ -60,6 +62,8 @@ Or inspect it in a browser with the MCP Inspector:
 .venv/bin/mcp dev server.py
 ```
 
+![Claude Code invoking Wendy's git_blame tool](wendy-claude.gif)
+
 ## Tech stack
 
 - **Python 3**
@@ -72,7 +76,7 @@ Or inspect it in a browser with the MCP Inspector:
 ```
 .
 ├── agent.py           # the agent: tool-use loop, CLI
-├── tools.py           # the three tools + helpers (shared by agent and server)
+├── tools.py           # the tools + helpers (shared by agent and server)
 ├── server.py          # MCP server exposing the tools to MCP clients
 ├── test_agent.py      # unit tests (run: python -m unittest test_agent)
 ├── requirements.txt   # Python dependencies
@@ -107,3 +111,4 @@ Or inspect it in a browser with the MCP Inspector:
 - [x] Noise filtering
 - [x] API error handling (retry + clean messages)
 - [x] MCP server (tools exposed to MCP clients)
+- [x] Git history tools (`git_log`, `git_blame`, `git_diff`, `repo_map`)
