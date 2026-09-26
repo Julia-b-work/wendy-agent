@@ -1,8 +1,8 @@
 # Wendy
 
 A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
-project and it explores the code itself — listing files, searching, and reading
-— then answers grounded in what it actually found, not what it guessed.
+project and it explores the code itself, listing files, searching, and reading
+,then answers grounded in what it actually found, not what it guessed.
 
 **Current version: 0.4.0** — see [CHANGELOG.md](CHANGELOG.md).
 
