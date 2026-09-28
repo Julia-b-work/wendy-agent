@@ -3,3 +3,4 @@ python-dotenv>=1.0.0
 mcp<2
 tree-sitter
 tree-sitter-python
+numpy

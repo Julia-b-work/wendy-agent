@@ -5,9 +5,11 @@ message rather than a crash. This is the module the MCP server imports to expose
 Wendy's capabilities to other clients.
 """
 
+import json
 import os
 import subprocess
 
+import numpy as np
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser
 
@@ -214,4 +216,114 @@ def find_definition(name, root="."):
                     out.append(f"{path}:{line}: {kind} {name}")
     if not out:
         return f"No definition found for {name}"
+    return truncate("\n".join(out))
+
+
+_model = None
+
+
+def _get_model():
+    """Return the sentence-transformers model, loaded lazily (it's heavy)."""
+    global _model
+    if _model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError(
+                "semantic_search requires 'sentence-transformers' "
+                "(pip install sentence-transformers)"
+            )
+        _model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _model
+
+
+def _symbol_chunks(path):
+    """Yield (name, line, source_text) for each function/class in a file."""
+    lang = _language_for(path)
+    if lang is None:
+        return
+    try:
+        with open(path, "rb") as f:
+            src = f.read()
+    except OSError:
+        return
+    tree = Parser(lang).parse(src)
+    types = _DEFINITION_TYPES[os.path.splitext(path)[1].lower()]
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type in types:
+            name_node = node.child_by_field_name("name")
+            name = name_node.text.decode() if name_node else "?"
+            text = src[node.start_byte:node.end_byte].decode(errors="ignore")
+            yield name, node.start_point[0] + 1, text[:2000]
+        stack.extend(node.children)
+
+
+def _collect_chunks(root):
+    """Return [(path, line, name, text), ...] for all symbols under root."""
+    chunks = []
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not skip_dir(d)]
+        for f in files:
+            path = os.path.join(dirpath, f)
+            if is_binary(path) or _language_for(path) is None:
+                continue
+            for name, line, text in _symbol_chunks(path):
+                chunks.append((path, line, name, text))
+    return chunks
+
+
+def _index_paths(root):
+    """Return the (vectors, metadata) cache paths for a project root."""
+    base = os.path.join(root, ".wendy_index")
+    return base + ".npy", base + ".json"
+
+
+def _build_index(root):
+    """Embed every symbol once and cache the vectors to disk."""
+    chunks = _collect_chunks(root)
+    if not chunks:
+        return
+    vecs = np.asarray(_get_model().encode([c[3] for c in chunks]))
+    vecs_path, meta_path = _index_paths(root)
+    np.save(vecs_path, vecs)
+    meta = [
+        {"path": c[0], "line": c[1], "name": c[2], "mtime": os.path.getmtime(c[0])}
+        for c in chunks
+    ]
+    with open(meta_path, "w") as f:
+        json.dump(meta, f)
+
+
+def _index_is_stale(root):
+    """Return True if the index is missing or a file changed since it was built."""
+    vecs_path, meta_path = _index_paths(root)
+    if not (os.path.exists(vecs_path) and os.path.exists(meta_path)):
+        return True
+    with open(meta_path) as f:
+        meta = json.load(f)
+    for m in meta:
+        if not os.path.exists(m["path"]) or os.path.getmtime(m["path"]) != m["mtime"]:
+            return True
+    return False
+
+
+def semantic_search(query, root=".", top_k=5):
+    """Return the functions/classes most semantically similar to `query`."""
+    if _index_is_stale(root):
+        _build_index(root)
+    vecs_path, meta_path = _index_paths(root)
+    if not (os.path.exists(vecs_path) and os.path.exists(meta_path)):
+        return "(no code to search)"
+    vecs = np.load(vecs_path)
+    with open(meta_path) as f:
+        meta = json.load(f)
+    q = np.asarray(_get_model().encode([query])).reshape(-1)
+    sims = vecs @ q / (np.linalg.norm(vecs, axis=1) * np.linalg.norm(q) + 1e-9)
+    idx = np.argsort(sims)[::-1][:top_k]
+    out = [
+        f"{sims[i]:.3f}  {meta[i]['path']}:{meta[i]['line']}: {meta[i]['name']}"
+        for i in idx
+    ]
     return truncate("\n".join(out))

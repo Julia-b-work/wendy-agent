@@ -3,6 +3,7 @@
 Run with: python -m unittest test_agent
 """
 
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -355,3 +356,49 @@ class TestSymbols(unittest.TestCase):
             open(os.path.join(d, "mod.py"), "w").close()
             out = tools.find_definition("nonexistent", root=d)
         self.assertIn("No definition found", out)
+
+
+class FakeModel:
+    """A fake embedder returning deterministic hash-based vectors (no model)."""
+
+    def encode(self, texts, **kwargs):
+        if isinstance(texts, str):
+            texts = [texts]
+        rows = []
+        for t in texts:
+            digest = hashlib.sha256(t.encode()).digest()
+            rows.append([b / 255.0 for b in digest[:32]])
+        return rows
+
+
+class TestSemanticSearch(unittest.TestCase):
+
+    def test_symbol_chunks(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "mod.py")
+            with open(p, "w") as f:
+                f.write("def foo():\n    return 1\n\nclass Bar:\n    def baz(self):\n        pass\n")
+            chunks = list(tools._symbol_chunks(p))
+        names = [c[0] for c in chunks]
+        self.assertIn("foo", names)
+        self.assertIn("Bar", names)
+        self.assertIn("baz", names)
+        foo_text = [c[2] for c in chunks if c[0] == "foo"][0]
+        self.assertIn("def foo", foo_text)
+
+    def test_semantic_search_returns_results(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "mod.py")
+            with open(p, "w") as f:
+                f.write("def foo():\n    return 1\n")
+            with mock.patch.object(tools, "_get_model", return_value=FakeModel()):
+                out = tools.semantic_search("foo", root=d)
+        self.assertIn("mod.py", out)
+        self.assertIn("foo", out)
+
+    def test_semantic_search_no_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, "notes.txt"), "w").close()
+            with mock.patch.object(tools, "_get_model", return_value=FakeModel()):
+                out = tools.semantic_search("foo", root=d)
+        self.assertEqual(out, "(no code to search)")

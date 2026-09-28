@@ -57,5 +57,10 @@ def find_definition(name: str, root: str = ".") -> str:
     """Find where a function or class is defined across the project."""
     return tools.find_definition(name, root)
 
+@mcp.tool()
+def semantic_search(query: str, root: str = ".", top_k: int = 5) -> str:
+    """Find functions/classes semantically related to a natural-language query."""
+    return tools.semantic_search(query, root, top_k)
+
 if __name__ == "__main__":
     mcp.run()

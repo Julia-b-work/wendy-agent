@@ -3,6 +3,18 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [0.6.0] - 2026-09-28
+
+### Added
+
+- **Semantic search** — `semantic_search` finds functions/classes by natural
+  language: tree-sitter chunks code by function, sentence-transformers embeds
+  it, and a cached index (rebuilt only when files change) makes queries fast.
+
+### Changed
+
+- Test suite grew to 37 tests.
+
 ## [0.5.0] - 2026-09-28
 
 ### Added
