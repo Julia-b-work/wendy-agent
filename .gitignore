@@ -12,3 +12,6 @@ __pycache__/
 
 # os
 .DS_Store
+
+# demo videos (large binaries; the .gif and .tape demos are committed instead)
+*.mp4

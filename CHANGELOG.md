@@ -7,25 +7,16 @@ All notable changes to this project are recorded here. Versions follow
 
 ### Added
 
-- **Semantic search** — `semantic_search` finds functions/classes by natural
-  language: tree-sitter chunks code by function, sentence-transformers embeds
-  it, and a cached index (rebuilt only when files change) makes queries fast.
+- **Code understanding** — tree-sitter powers two new ways to explore a
+  codebase: `list_symbols` and `find_definition` parse code into syntax trees,
+  so "where is X defined?" returns the actual definition instead of a string
+  match; and `semantic_search` finds functions/classes by natural language
+  using sentence-transformers embeddings with a cached index (rebuilt only
+  when files change). Python first; more languages are a two-line addition.
 
 ### Changed
 
 - Test suite grew to 37 tests.
-
-## [0.5.0] - 2026-09-28
-
-### Added
-
-- **Symbol search** — `list_symbols` and `find_definition` parse code with
-  tree-sitter, so "where is X defined?" returns the actual definition instead
-  of a string match. Python first; more languages are a two-line addition.
-
-### Changed
-
-- Test suite grew to 34 tests.
 
 ## [0.4.0] - 2026-09-26
 
