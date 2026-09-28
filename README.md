@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself, listing files, searching, and reading
 ,then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.4.0** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 0.5.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -22,7 +22,10 @@ project and it explores the code itself, listing files, searching, and reading
 - **Command-line interface** — ask questions directly: `agent.py "question"`.
 - **History-aware** — `git_log`, `git_blame`, `git_diff`, and `repo_map` answer
   the "why did this change?" questions that plain search can't.
-- **MCP server** — all seven tools are exposed as a Model Context Protocol
+- **Symbol-aware** — `list_symbols` and `find_definition` use tree-sitter to
+  parse code into syntax trees, so "where is X defined?" returns the real
+  definition, not a string match.
+- **MCP server** — all nine tools are exposed as a Model Context Protocol
   server (`server.py`), so Claude Code and other MCP clients can use them.
 
 ## How it works
@@ -112,3 +115,4 @@ Or inspect it in a browser with the MCP Inspector:
 - [x] API error handling (retry + clean messages)
 - [x] MCP server (tools exposed to MCP clients)
 - [x] Git history tools (`git_log`, `git_blame`, `git_diff`, `repo_map`)
+- [x] Symbol search (`list_symbols`, `find_definition` via tree-sitter)

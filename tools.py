@@ -8,6 +8,9 @@ Wendy's capabilities to other clients.
 import os
 import subprocess
 
+import tree_sitter_python as tspython
+from tree_sitter import Language, Parser
+
 # Result strings are capped so a huge file or listing can't blow up the context
 # window sent to the model.
 MAX_RESULT_CHARS = 16000
@@ -24,6 +27,17 @@ IGNORED_DIRS = {
     ".idea",
     ".vscode",
     "target",
+}
+
+
+# Map file extension -> tree-sitter language.
+_LANGUAGES = {
+    ".py": Language(tspython.language()),
+}
+
+# Node types that count as "definitions", per language.
+_DEFINITION_TYPES = {
+    ".py": ("function_definition", "class_definition"),
 }
 
 
@@ -147,3 +161,57 @@ def git_diff(path=None):
     if path:
         args += ["--", path]
     return truncate(_run_git(args) or "(no uncommitted changes)")
+
+
+def _language_for(path):
+    """Return the tree-sitter Language for a file, or None if unsupported."""
+    return _LANGUAGES.get(os.path.splitext(path)[1].lower())
+
+
+def _symbols_in_file(path):
+    """Return [(name, line, kind), ...] for function/class definitions."""
+    lang = _language_for(path)
+    if lang is None:
+        return []
+    try:
+        with open(path, "rb") as f:
+            src = f.read()
+    except OSError:
+        return []
+    tree = Parser(lang).parse(src)
+    types = _DEFINITION_TYPES[os.path.splitext(path)[1].lower()]
+    out = []
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type in types:
+            name_node = node.child_by_field_name("name")
+            name = name_node.text.decode() if name_node else "?"
+            out.append((name, node.start_point[0] + 1, node.type))
+        stack.extend(node.children)
+    return out
+
+
+def list_symbols(path):
+    """List the functions and classes defined in a file, in file order."""
+    symbols = sorted(_symbols_in_file(path), key=lambda s: s[1])
+    if not symbols:
+        return f"No symbols found in {path}"
+    return truncate("\n".join(f"{line:5}  {kind:20}  {name}" for name, line, kind in symbols))
+
+
+def find_definition(name, root="."):
+    """Find where `name` is defined across the project."""
+    out = []
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not skip_dir(d)]
+        for f in files:
+            path = os.path.join(dirpath, f)
+            if is_binary(path) or _language_for(path) is None:
+                continue
+            for sym_name, line, kind in _symbols_in_file(path):
+                if sym_name == name:
+                    out.append(f"{path}:{line}: {kind} {name}")
+    if not out:
+        return f"No definition found for {name}"
+    return truncate("\n".join(out))

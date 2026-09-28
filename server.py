@@ -47,5 +47,15 @@ def git_diff(path: Optional[str] = None) -> str:
     """Show uncommitted changes, optionally limited to one file."""
     return tools.git_diff(path)
 
+@mcp.tool()
+def list_symbols(path: str) -> str:
+    """List the functions and classes defined in a file, with line numbers."""
+    return tools.list_symbols(path)
+
+@mcp.tool()
+def find_definition(name: str, root: str = ".") -> str:
+    """Find where a function or class is defined across the project."""
+    return tools.find_definition(name, root)
+
 if __name__ == "__main__":
     mcp.run()

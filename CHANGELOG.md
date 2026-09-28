@@ -3,6 +3,18 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [0.5.0] - 2026-09-28
+
+### Added
+
+- **Symbol search** — `list_symbols` and `find_definition` parse code with
+  tree-sitter, so "where is X defined?" returns the actual definition instead
+  of a string match. Python first; more languages are a two-line addition.
+
+### Changed
+
+- Test suite grew to 34 tests.
+
 ## [0.4.0] - 2026-09-26
 
 ### Added

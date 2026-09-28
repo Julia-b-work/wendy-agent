@@ -319,3 +319,39 @@ class TestGitTools(unittest.TestCase):
             finally:
                 os.chdir(self._old_cwd)
         self.assertIn("git error", out)
+
+
+class TestSymbols(unittest.TestCase):
+
+    def test_list_symbols(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "mod.py")
+            with open(p, "w") as f:
+                f.write("def foo():\n    pass\n\n\nclass Bar:\n    def method(self):\n        pass\n")
+            out = tools.list_symbols(p)
+        self.assertIn("foo", out)
+        self.assertIn("Bar", out)
+        self.assertIn("method", out)
+
+    def test_list_symbols_unsupported_language(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "notes.txt")
+            with open(p, "w") as f:
+                f.write("def foo():\n    pass\n")
+            out = tools.list_symbols(p)
+        self.assertIn("No symbols found", out)
+
+    def test_find_definition(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "mod.py")
+            with open(p, "w") as f:
+                f.write("def foo():\n    pass\n")
+            out = tools.find_definition("foo", root=d)
+        self.assertIn("foo", out)
+        self.assertIn("mod.py", out)
+
+    def test_find_definition_not_found(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, "mod.py"), "w").close()
+            out = tools.find_definition("nonexistent", root=d)
+        self.assertIn("No definition found", out)
