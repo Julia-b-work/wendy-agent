@@ -195,6 +195,6 @@ def run_agent(question, max_steps=None, client=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python agent.py \"your question here\"")
+        print("Usage: python src/agent.py \"your question here\"")
     else:
         print(run_agent(sys.argv[1]))

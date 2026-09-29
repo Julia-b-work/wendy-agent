@@ -19,7 +19,7 @@ project and it explores the code itself, listing files, searching, and reading
 - **Robust** — a crashing tool can't kill the run, results are truncated to a
   sane size, binary files and junk directories are filtered out, and API errors
   are retried with backoff and reported cleanly.
-- **Command-line interface** — ask questions directly: `agent.py "question"`.
+- **Command-line interface** — ask questions directly: `src/agent.py "question"`.
 - **History-aware** — `git_log`, `git_blame`, `git_diff`, and `repo_map` answer
   the "why did this change?" questions that plain search can't.
 - **Symbol-aware** — `list_symbols` and `find_definition` use tree-sitter to
@@ -29,7 +29,7 @@ project and it explores the code itself, listing files, searching, and reading
   the auth logic?" and it returns the matching functions even when those words
   never appear in the code, via a cached embedding index.
 - **MCP server** — all ten tools are exposed as a Model Context Protocol
-  server (`server.py`), so Claude Code and other MCP clients can use them.
+  server (`src/server.py`), so Claude Code and other MCP clients can use them.
 
 ## How it works
 
@@ -53,40 +53,49 @@ pauses and asks you whether to continue, and asks Claude to justify itself.
 Wendy's tools are also available as a [Model Context Protocol](https://modelcontextprotocol.io) server:
 
 ```bash
-.venv/bin/python server.py
+.venv/bin/python src/server.py
 ```
 
 Register it with Claude Code:
 
 ```bash
-claude mcp add wendy -- .venv/bin/python server.py
+claude mcp add wendy -- .venv/bin/python src/server.py
 ```
 
 Or inspect it in a browser with the MCP Inspector:
 
 ```bash
-.venv/bin/mcp dev server.py
+.venv/bin/mcp dev src/server.py
 ```
 
-![Claude Code invoking Wendy's git_blame tool](wendy-claude.gif)
+![Claude Code invoking Wendy's git_blame tool](../wendy-claude.gif)
 
 ## Tech stack
 
 - **Python 3**
 - **anthropic** — Claude API client (tool use)
 - **python-dotenv** — loads the API key from `.env`
-- **mcp** — Model Context Protocol (the `server.py` interface)
+- **mcp** — Model Context Protocol (the `src/server.py` interface)
 
 ## Project structure
 
 ```
 .
-├── agent.py           # the agent: tool-use loop, CLI
-├── tools.py           # the tools + helpers (shared by agent and server)
-├── server.py          # MCP server exposing the tools to MCP clients
-├── test_agent.py      # unit tests (run: python -m unittest test_agent)
-├── requirements.txt   # Python dependencies
-├── .env               # Anthropic API key (gitignored)
+├── src/
+│   ├── agent.py        # the agent: tool-use loop, CLI
+│   ├── tools.py        # the tools + helpers (shared by agent and server)
+│   └── server.py       # MCP server exposing the tools to MCP clients
+├── tests/
+│   └── test_agent.py   # unit tests (run: python -m unittest discover -s tests)
+├── docs/
+│   ├── README.md       # this file
+│   └── CHANGELOG.md
+├── requirements.txt    # Python dependencies
+├── Dockerfile          # container build for the MCP server
+├── LICENSE
+├── demo.tape           # VHS source for the CLI demo
+├── wendy-claude.gif    # demo: Claude Code invoking the MCP server
+├── .env                # Anthropic API key (gitignored)
 └── .gitignore
 ```
 
@@ -103,7 +112,7 @@ Or inspect it in a browser with the MCP Inspector:
    ```
 3. Run:
    ```bash
-   .venv/bin/python agent.py "what does run_agent do?"
+   .venv/bin/python src/agent.py "what does run_agent do?"
    ```
 
 ## Status

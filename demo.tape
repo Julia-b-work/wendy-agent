@@ -14,7 +14,7 @@ Enter
 Sleep 500ms
 
 # Run the agent: this chains search -> read_file -> answer.
-Type ".venv/bin/python agent.py 'what does run_agent do?'"
+Type ".venv/bin/python src/agent.py 'what does run_agent do?'"
 Enter
 
 # Let it finish — the Claude API calls take a few seconds each.

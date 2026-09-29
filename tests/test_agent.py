@@ -6,8 +6,13 @@ Run with: python -m unittest test_agent
 import hashlib
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
+
+# Make src/ importable when running tests from anywhere in the repo.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+
 import agent
 import anthropic
 import tools
