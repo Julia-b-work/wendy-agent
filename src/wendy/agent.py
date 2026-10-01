@@ -8,7 +8,7 @@ import sys
 import time
 import anthropic
 from dotenv import load_dotenv
-from tools import list_files, read_file, search
+from wendy.tools import list_files, read_file, search
 
 # After this many tool-using turns, pause and ask the human to continue.
 STEP_LIMIT = 10
@@ -193,8 +193,12 @@ def run_agent(question, max_steps=None, client=None):
     return f"Stopped after {max_steps} steps without a final answer."
 
 
-if __name__ == "__main__":
+def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: python src/agent.py \"your question here\"")
-    else:
-        print(run_agent(sys.argv[1]))
+        print("Usage: wendy \"your question here\"")
+        return
+    print(run_agent(sys.argv[1]))
+
+
+if __name__ == "__main__":
+    main()

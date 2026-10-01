@@ -13,9 +13,9 @@ import unittest
 # Make src/ importable when running tests from anywhere in the repo.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-import agent
+from wendy import agent
 import anthropic
-import tools
+from wendy import tools
 
 from types import SimpleNamespace
 from unittest import mock

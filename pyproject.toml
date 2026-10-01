@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wendy-agent"
+version = "0.5.0"
+description = "Wendy: an agentic codebase Q&A agent on Claude's tool-use API, exposed as an MCP server."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "anthropic>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "mcp<2",
+    "tree-sitter",
+    "tree-sitter-python",
+    "numpy",
+]
+
+[project.optional-dependencies]
+semantic = ["sentence-transformers"]
+
+[project.scripts]
+wendy = "wendy.agent:main"
+wendy-server = "wendy.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wendy"]

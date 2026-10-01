@@ -8,7 +8,8 @@ become the input schema.
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
-import tools
+from wendy import tools
+from wendy import verify
 
 mcp = FastMCP("wendy")
 
@@ -62,5 +63,18 @@ def semantic_search(query: str, root: str = ".", top_k: int = 5) -> str:
     """Find functions/classes semantically related to a natural-language query."""
     return tools.semantic_search(query, root, top_k)
 
-if __name__ == "__main__":
+@mcp.tool()
+def verify_claim(claim: str, root: str = ".", use_llm: bool = False) -> str:
+    """Check whether a natural-language claim about the code is supported or contradicted.
+
+    Returns a summary plus per-check findings with evidence line numbers.
+    """
+    verdict = verify.verify_claim(claim, root, use_llm=use_llm)
+    return verify.format_verdict(verdict)
+
+def main() -> None:
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
