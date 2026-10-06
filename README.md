@@ -28,7 +28,11 @@ then answers grounded in what it actually found, not what it guessed.
 - **Semantic search** — `semantic_search` finds code by meaning: ask "where's
   the auth logic?" and it returns the matching functions even when those words
   never appear in the code, via a cached embedding index.
-- **MCP server** — all ten tools are exposed as a Model Context Protocol
+- **Claim verification** — `verify_claim` checks a natural-language claim about
+  the code (for example, "run_loop has a step limit") and reports whether it is
+  supported or contradicted, with the evidence line numbers, instead of
+  guessing.
+- **MCP server** — all eleven tools are exposed as a Model Context Protocol
   server (`wendy-server`), so Claude Code and other MCP clients can use them.
 
 ## How it works
@@ -145,5 +149,6 @@ CI runs the tests on Python 3.10, 3.12, and 3.13 on every push and pull request.
 - [x] Git history tools (`git_log`, `git_blame`, `git_diff`, `repo_map`)
 - [x] Symbol search (`list_symbols`, `find_definition` via tree-sitter)
 - [x] Semantic search (`semantic_search` via embeddings + cached index)
+- [x] Claim verification (`verify_claim`, supported/contradicted with evidence lines)
 - [x] Packaging (`pyproject.toml`, `wendy` and `wendy-server` entry points)
 - [x] CI (tests on Python 3.10, 3.12, 3.13)

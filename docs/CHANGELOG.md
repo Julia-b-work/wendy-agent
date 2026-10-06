@@ -3,6 +3,21 @@
 All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH.
 
+## [Unreleased]
+
+### Added
+
+- **Claim verification** — `verify_claim` checks a natural-language claim about
+  the code and reports whether it is supported or contradicted, with the
+  evidence line numbers. Eight deterministic verifiers (step limits, retries,
+  error handling, file writing, calls, named constants, imports, values) plus
+  an optional Claude judge for inconclusive cases. Exposed as the eleventh MCP
+  tool.
+
+### Changed
+
+- Test suite grew from 37 to 83 tests (46 new verify tests).
+
 ## [0.5.0] - 2026-09-28
 
 ### Added
