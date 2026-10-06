@@ -86,6 +86,19 @@ class TestBoundedLoop(unittest.TestCase):
         f = _verify_bounded_loop(loc, "")
         self.assertEqual(f.verdict, NOT_FOUND)
 
+    def test_named_step_limit_constant(self):
+        # run_agent-style: a conditional `while` plus a STEP_LIMIT gate reference.
+        loc = make_located([
+            "def run_agent():",
+            "    step = 0",
+            "    while max_steps is None or step < max_steps:",
+            "        step += 1",
+            "        if step == STEP_LIMIT + 1:",
+            "            pass",
+        ])
+        f = _verify_bounded_loop(loc, "")
+        self.assertEqual(f.verdict, SUPPORTED)
+
 
 class TestRetries(unittest.TestCase):
 
@@ -116,9 +129,44 @@ class TestWritesFile(unittest.TestCase):
         f = _verify_writes_file(make_located(["def foo():", "    with open('x.txt', 'w') as f:", "        f.write('hi')"]), "")
         self.assertEqual(f.verdict, SUPPORTED)
 
-    def test_no_write(self):
+    def test_no_write_is_inconclusive_not_contradicted(self):
+        # No direct write means "delegation is possible", not "claim is false".
         f = _verify_writes_file(make_located(["def foo():", "    return 0"]), "")
-        self.assertEqual(f.verdict, CONTRADICTED)
+        self.assertEqual(f.verdict, NOT_FOUND)
+
+    def test_delegated_write_is_supported(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "mod.py"), "w") as f:
+                f.write("def write_cfg():\n    with open('x.txt', 'w') as fh:\n        fh.write('hi')\n\ndef run_job():\n    return write_cfg()\n")
+            v = verify_claim("run_job writes a file", root=d)
+        self.assertEqual(v.summary, SUPPORTED)
+        self.assertEqual(v.confidence, 1.0)
+        self.assertTrue(any(f.check == "writes_file" and f.verdict == SUPPORTED for f in v.findings))
+
+    def test_cache_claim_flags_write_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "mod.py"), "w") as f:
+                f.write("def write_cfg():\n    with open('x.txt', 'w') as fh:\n        fh.write('hi')\n\ndef run_job():\n    return write_cfg()\n")
+            v = verify_claim("run_job caches the index", root=d)
+        self.assertEqual(v.summary, SUPPORTED)
+        self.assertEqual(v.confidence, 0.5)
+        self.assertIn("read-back not verified", v.findings[0].note)
+
+    def test_write_claim_has_no_cache_caveat(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "mod.py"), "w") as f:
+                f.write("def write_cfg():\n    with open('x.txt', 'w') as fh:\n        fh.write('hi')\n\ndef run_job():\n    return write_cfg()\n")
+            v = verify_claim("run_job writes a file", root=d)
+        self.assertEqual(v.summary, SUPPORTED)
+        self.assertEqual(v.confidence, 1.0)
+        self.assertNotIn("read-back not verified", v.findings[0].note)
+
+    def test_delegated_write_to_non_writer_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "mod.py"), "w") as f:
+                f.write("def helper():\n    return 1\n\ndef run_job():\n    return helper()\n")
+            v = verify_claim("run_job writes a file", root=d)
+        self.assertEqual(v.summary, INCONCLUSIVE)
 
 
 class TestCallsFunction(unittest.TestCase):
@@ -184,12 +232,23 @@ class TestConstantValue(unittest.TestCase):
         f = _verify_constant_value(loc, "foo limit of 10")
         self.assertEqual(f.verdict, CONTRADICTED)
 
+    def test_no_number_returns_none(self):
+        loc = make_located(["def foo():", "    return 0"],
+                           module_lines=["STEP_LIMIT = 10", "def foo():", "    return 0"])
+        self.assertIsNone(_verify_constant_value(loc, "foo has a step limit"))
+
 
 class TestCheck(unittest.TestCase):
 
     def test_runs_only_selected_and_skips_unknown(self):
         loc = make_located(["def foo():", "    return 0"])
         findings = check(["bounded_loop", "nonexistent"], loc, "")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].check, "bounded_loop")
+
+    def test_skips_none_from_verifier(self):
+        loc = make_located(["def foo():", "    return 0"])
+        findings = check(["bounded_loop", "constant_value"], loc, "foo has a step limit")
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].check, "bounded_loop")
 
@@ -228,6 +287,14 @@ class TestVerifyClaim(unittest.TestCase):
                 f.write("STEP_LIMIT = 10\n\ndef run_loop():\n    step = 0\n    while step < STEP_LIMIT:\n        step += 1\n")
             v = verify_claim("run_loop has a step limit", root=d)
         self.assertEqual(v.subject, "run_loop")
+        self.assertEqual(v.summary, SUPPORTED)
+        self.assertTrue(any(f.check == "bounded_loop" and f.verdict == SUPPORTED for f in v.findings))
+
+    def test_step_limit_via_named_constant(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "mod.py"), "w") as f:
+                f.write("STEP_LIMIT = 10\n\ndef run_loop():\n    step = 0\n    while max_steps is None or step < max_steps:\n        step += 1\n        if step == STEP_LIMIT + 1:\n            break\n")
+            v = verify_claim("run_loop has a step limit", root=d)
         self.assertEqual(v.summary, SUPPORTED)
         self.assertTrue(any(f.check == "bounded_loop" and f.verdict == SUPPORTED for f in v.findings))
 

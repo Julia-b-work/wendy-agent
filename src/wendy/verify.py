@@ -38,6 +38,7 @@ class Finding:
     file: str
     lines: list[int]
     note: str
+    confidence: float = 1.0
 
 
 @dataclass
@@ -72,6 +73,11 @@ SIGNAL_KEYWORDS = {
 }
 
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+# ALL_CAPS names that conventionally denote a step/iteration limit.
+_STEP_LIMIT_NAMES = re.compile(
+    r"\b(STEP_LIMIT|MAX_STEPS|MAX_ITERATIONS|MAX_ITER|MAX_TURNS|MAX_LOOPS)\b"
+)
 
 
 def _looks_like_code_to_me(word):
@@ -116,6 +122,7 @@ class Located:
     start_line: int          # 1-based line the definition starts on
     lines: list[str]         # the definition's source, split into lines
     module_lines: list[str]  # the whole file's lines (for module-level checks)
+    root: str = "."          # project root the definition was located under
 
 
 def locate(subject, root="."):
@@ -143,10 +150,11 @@ def locate(subject, root="."):
         start_line=start_line,
         lines=lines,
         module_lines=read_file(path).splitlines(),
+        root=root,
     )
 
 
-def _finding(check, located, verdict, lines, note):
+def _finding(check, located, verdict, lines, note, confidence=1.0):
     """Build a Finding with the shared fields filled in."""
     return Finding(
         check=check,
@@ -155,6 +163,7 @@ def _finding(check, located, verdict, lines, note):
         file=located.file,
         lines=lines,
         note=note,
+        confidence=confidence,
     )
 
 
@@ -168,7 +177,12 @@ def _scan(lines, base, predicate):
 
 
 def _supported_or_contradicted(check, located, lines, what):
-    """A presence check: the feature is either there (supported) or not."""
+    """A presence check: the feature is either there (supported) or not.
+
+    Absence in the function's own body genuinely contradicts the claim for the
+    checks that use this helper (retries, error handling), so the not-found
+    case is CONTRADICTED here.
+    """
     if lines:
         return _finding(check, located, SUPPORTED, lines,
                         f"found {what} on {len(lines)} line(s)")
@@ -181,9 +195,11 @@ def _supported_or_contradicted(check, located, lines, what):
 def _verify_bounded_loop(located, claim):
     """Detect a loop whose iteration count is capped by a numeric step limit.
 
-    Counts `for ... in range(...)` and a hard-bounded `while <comparison>`.
-    Ignores `for x in collection` (bounded by data, not a step limit) and
-    `while True`. A `while ... is None ...` bound is conditional -> NOT_FOUND.
+    Counts `for ... in range(...)`, a hard-bounded `while <comparison>`, and a
+    reference to a named step-limit constant (`STEP_LIMIT`, `MAX_STEPS`, ...)
+    used in a comparison or compound assignment. Ignores `for x in collection`
+    (bounded by data, not a step limit) and `while True`. A `while ... is None
+    ...` bound with no step-limit constant is conditional -> NOT_FOUND.
     """
     def counter_for(line):
         return line.strip().startswith("for ") and " in range(" in line
@@ -200,15 +216,23 @@ def _verify_bounded_loop(located, claim):
                 and any(op in s for op in ("<", ">", "<=", ">=", "!="))
                 and " is None" in s)
 
+    def step_limit_ref(line):
+        return (_STEP_LIMIT_NAMES.search(line) is not None
+                and re.search(r"==|!=|<=|>=|<|>|\+=|-=", line) is not None)
+
     counter = _scan(located.lines, located.start_line, counter_for)
     hard = _scan(located.lines, located.start_line, hard_while)
     if counter or hard:
         total = counter + hard
         return _finding("bounded_loop", located, SUPPORTED, total,
                         f"found {len(total)} step-limited loop(s)")
+    const = _scan(located.lines, located.start_line, step_limit_ref)
+    if const:
+        return _finding("bounded_loop", located, SUPPORTED, const,
+                        f"found {len(const)} step-limit reference(s)")
     if _scan(located.lines, located.start_line, conditional_while):
         return _finding("bounded_loop", located, NOT_FOUND, [],
-                        "no hard step limit found — loop bound is conditional (`is None` branch)")
+                        "no hard step limit found - loop bound is conditional (`is None` branch)")
     return _finding("bounded_loop", located, CONTRADICTED, [],
                     "no step-limited loop found")
 
@@ -230,18 +254,79 @@ def _verify_handles_error(located, claim):
     return _supported_or_contradicted("handles_error", located, lines, "error handling")
 
 
+_WRITE_SIGS = (".write(", ".save(", "np.save", "json.dump", ".to_csv")
+_WRITE_MODES = ('"w"', "'w'", '"a"', "'a'", '"wb"', '"ab"')
+
+
+def _line_writes(line):
+    """True if `line` looks like it writes a file directly."""
+    low = line.lower()
+    return any(sig in low for sig in _WRITE_SIGS) or (
+        "open(" in low and any(m in low for m in _WRITE_MODES)
+    )
+
+
+def _delegated_write(located, caveat="", confidence=1.0):
+    """Return a SUPPORTED Finding if a directly-called helper writes a file.
+
+    Resolves each name the function calls (via locate) and checks that helper's
+    own body for a write. Returns None when no directly-called helper writes.
+    One level only: a write buried deeper in the call graph stays out of scope.
+    `caveat` is appended to the note and `confidence` is the finding's weight
+    (for a "caches" claim verified by write evidence only).
+    """
+    seen = set()
+    for line in located.lines:
+        for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", line):
+            name = m.group(1)
+            if name == located.name or name in seen:
+                continue
+            seen.add(name)
+            helper = locate(name, located.root)
+            if helper is None:
+                continue
+            lines = _scan(helper.lines, helper.start_line, _line_writes)
+            if lines:
+                return Finding(
+                    check="writes_file",
+                    verdict=SUPPORTED,
+                    subject=located.name,
+                    file=helper.file,
+                    lines=lines,
+                    note=f"{name}() writes a file on {len(lines)} line(s){caveat}",
+                    confidence=confidence,
+                )
+    return None
+
+
 def _verify_writes_file(located, claim):
-    write_sigs = (".write(", ".save(", "np.save", "json.dump", ".to_csv")
-    write_modes = ('"w"', "'w'", '"a"', "'a'", '"wb"', '"ab"')
+    """Check whether the located function writes (or caches to) a file.
 
-    def writes(line):
-        low = line.lower()
-        return any(sig in low for sig in write_sigs) or (
-            "open(" in low and any(m in low for m in write_modes)
-        )
+    Looks for a direct write in the function's own body first, then follows the
+    helpers it calls one level deep, because "X caches" is commonly delegated
+    (the function calls a helper that writes). A write at either level is
+    SUPPORTED; none at either level is NOT_FOUND (deeper delegation is out of
+    scope, so "not here" does not mean "contradicted").
 
-    lines = _scan(located.lines, located.start_line, writes)
-    return _supported_or_contradicted("writes_file", located, lines, "direct file-writing")
+    For "caches"/"cache" claims the note flags that only the write was checked:
+    writing is evidence of caching but not proof, since a real cache is also
+    read back on later calls.
+    """
+    caveat = ""
+    confidence = 1.0
+    if re.search(r"\bcach", claim.lower()):
+        caveat = " (write only; read-back not verified)"
+        confidence = 0.5
+    lines = _scan(located.lines, located.start_line, _line_writes)
+    if lines:
+        return _finding("writes_file", located, SUPPORTED, lines,
+                        f"found direct file-writing on {len(lines)} line(s){caveat}",
+                        confidence=confidence)
+    delegated = _delegated_write(located, caveat, confidence)
+    if delegated is not None:
+        return delegated
+    return _finding("writes_file", located, NOT_FOUND, [],
+                    "no direct or one-level delegated file-writing found")
 
 
 def _verify_calls_function(located, claim):
@@ -300,10 +385,14 @@ def _verify_imports_module(located, claim):
 
 
 def _verify_constant_value(located, claim):
+    """Verify a numeric value named in the claim appears in the module.
+
+    Returns None when the claim names no number, so check() skips it instead of
+    emitting a pointless not_found finding.
+    """
     m = re.search(r"\b(\d+)\b", claim)
     if m is None:
-        return _finding("constant_value", located, NOT_FOUND, [],
-                        "no numeric value named in the claim")
+        return None
     value = m.group(1)
     lines = _scan(located.module_lines, 1,
                   lambda l: re.search(r"\b" + value + r"\b", l) is not None)
@@ -327,12 +416,18 @@ _VERIFIERS = {
 
 
 def check(signals, located, claim):
-    """Run the selected verifiers against a located definition, return findings."""
+    """Run the selected verifiers against a located definition, return findings.
+
+    A verifier may return None to decline (for example, constant_value when the
+    claim names no number); those are skipped.
+    """
     findings = []
     for signal in signals:
         verifier = _VERIFIERS.get(signal)
         if verifier is not None:
-            findings.append(verifier(located, claim))
+            finding = verifier(located, claim)
+            if finding is not None:
+                findings.append(finding)
     return findings
 
 
@@ -342,11 +437,13 @@ def roll_up(findings):
     Contradiction wins: if any check is contradicted the whole claim is marked
     contradicted, because "X does A and B" is false if any part is false.
     Confidence is the fraction of checks that point the same way as the summary.
+    A finding with a confidence below 1.0 (a partial check, for example a
+    "caches" claim verified by write evidence only) counts for less.
     """
     if not findings:
         return INCONCLUSIVE, 0.0
-    supported = sum(1 for f in findings if f.verdict == SUPPORTED)
-    contradicted = sum(1 for f in findings if f.verdict == CONTRADICTED)
+    supported = sum(f.confidence for f in findings if f.verdict == SUPPORTED)
+    contradicted = sum(f.confidence for f in findings if f.verdict == CONTRADICTED)
     total = len(findings)
     if contradicted:
         return CONTRADICTED, contradicted / total
@@ -543,7 +640,7 @@ def format_verdict(v):
     """Render a Verdict as a readable string for CLI/MCP output."""
     head = f"{v.summary} (confidence {v.confidence:.2f})"
     if v.subject:
-        head += f" — subject: {v.subject}"
+        head += f" - subject: {v.subject}"
     if not v.findings:
         return head + "\n  (no findings)"
     lines_out = []

@@ -112,7 +112,7 @@ def _create(client, messages):
     """Call the API, retrying transient errors with exponential backoff."""
     system = (
         "You are a coding assistant exploring a codebase. "
-        "Always use your tools to gather real information before answering — "
+        "Always use your tools to gather real information before answering - "
         "never guess or tell the user to do it manually."
     )
     delay = 1.0
