@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wendy-agent"
-version = "0.5.0"
+version = "0.6.0"
 description = "Wendy: an agentic codebase Q&A agent on Claude's tool-use API, exposed as an MCP server."
 readme = "README.md"
 requires-python = ">=3.10"

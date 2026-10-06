@@ -4,7 +4,7 @@ A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself, listing files, searching, and reading,
 then answers grounded in what it actually found, not what it guessed.
 
-**Current version: 0.5.0** — see [CHANGELOG.md](docs/CHANGELOG.md).
+**Current version: 0.6.0** — see [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## What it does
 
