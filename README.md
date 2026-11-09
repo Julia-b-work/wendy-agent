@@ -2,37 +2,41 @@
 
 A codebase Q&A agent built on Claude's tool-use API. Ask a question about a
 project and it explores the code itself, listing files, searching, and reading,
-then answers grounded in what it actually found, not what it guessed.
+then answers grounded in what it actually found.
 
 **Current version: 0.6.0** — see [CHANGELOG.md](docs/CHANGELOG.md).
 
+## Dedication
+
+Dedicated to Wendy, that inspires me to always keep going.
+
 ## What it does
 
-- **Autonomous exploration** — given a question, decides which tool it needs and
+- **Autonomous exploration**: given a question, decides which tool it needs and
   runs it, chaining multiple tools until it has enough real information.
-- **Three tools** — `list_files` (walk a directory), `read_file` (read a file),
+- **Three tools**: `list_files` (walk a directory), `read_file` (read a file),
   and `search` (find a string across the whole project with line numbers).
-- **Visible reasoning** — prints every step of the loop, so you can watch it
+- **Visible reasoning**: prints every step of the loop, so you can watch it
   think instead of trusting a black box.
-- **Bounded loop** — after 10 tool-using turns, the agent pauses to ask you to
+- **Bounded loop**: after 10 tool-using turns, the agent pauses to ask you to
   continue and prompts Claude to justify itself before going on.
-- **Robust** — a crashing tool can't kill the run, results are truncated to a
+- **Robust**: a crashing tool can't kill the run, results are truncated to a
   sane size, binary files and junk directories are filtered out, and API errors
   are retried with backoff and reported cleanly.
-- **Command-line interface** — ask questions directly: `wendy "question"`.
-- **History-aware** — `git_log`, `git_blame`, `git_diff`, and `repo_map` answer
+- **Command-line interface**: ask questions directly: `wendy "question"`.
+- **History-aware**: `git_log`, `git_blame`, `git_diff`, and `repo_map` answer
   the "why did this change?" questions that plain search can't.
-- **Symbol-aware** — `list_symbols` and `find_definition` use tree-sitter to
+- **Symbol-aware**: `list_symbols` and `find_definition` use tree-sitter to
   parse code into syntax trees, so "where is X defined?" returns the real
   definition, not a string match.
-- **Semantic search** — `semantic_search` finds code by meaning: ask "where's
+- **Semantic search**: `semantic_search` finds code by meaning: ask "where's
   the auth logic?" and it returns the matching functions even when those words
   never appear in the code, via a cached embedding index.
-- **Claim verification** — `verify_claim` checks a natural-language claim about
+- **Claim verification**: `verify_claim` checks a natural-language claim about
   the code (for example, "run_loop has a step limit") and reports whether it is
   supported or contradicted, with the evidence line numbers, instead of
   guessing.
-- **MCP server** — all eleven tools are exposed as a Model Context Protocol
+- **MCP server**: all eleven tools are exposed as a Model Context Protocol
   server (`wendy-server`), so Claude Code and other MCP clients can use them.
 
 ## How it works
@@ -77,11 +81,11 @@ Or inspect it in a browser with the MCP Inspector:
 ## Tech stack
 
 - **Python 3.10+**
-- **anthropic** — Claude API client (tool use)
-- **python-dotenv** — loads the API key from `.env`
-- **mcp** — Model Context Protocol (the MCP server interface)
-- **tree-sitter** + **tree-sitter-python** — symbol search (`list_symbols`, `find_definition`)
-- **sentence-transformers** — optional, for `semantic_search` (see Setup)
+- **anthropic**: Claude API client (tool use)
+- **python-dotenv**: loads the API key from `.env`
+- **mcp**: Model Context Protocol (the MCP server interface)
+- **tree-sitter** + **tree-sitter-python**: symbol search (`list_symbols`, `find_definition`)
+- **sentence-transformers**: optional, for `semantic_search` (see Setup)
 
 ## Project structure
 
